@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global Intelligence API</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --border:   #2d3148;
+      --muted:    #64748b;
+      --text:     #e2e8f0;
+      --sub:      #94a3b8;
+      --accent:   #818cf8;
+      --btn:      #4f46e5;
+      --btn-h:    #4338ca;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .topbar h1 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+
+    .topbar label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+    #base-url {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--sub);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+
+    /* ── Mobile tab bar ── */
+    .tabbar {
+      display: none;
+      overflow-x: auto;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      gap: 0;
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .tabbar::-webkit-scrollbar { display: none; }
+
+    .tabbar button {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--sub);
+      padding: 0.7rem 1rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .tabbar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Desktop layout ── */
+    .body-row {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    nav {
+      width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 0;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    nav .section-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 1rem 1rem 0.35rem;
+    }
+
+    nav button {
+      background: none;
+      border: none;
+      border-left: 3px solid transparent;
+      color: var(--sub);
+      text-align: left;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+      width: 100%;
+    }
+    nav button:hover { color: var(--text); background: #22263a; }
+    nav button.active { color: var(--accent); border-left-color: var(--accent); background: #22263a; }
+
+    /* Main content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Form + response split */
+    .panels {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .form-panel {
+      width: 360px;
+      padding: 1.25rem;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .response-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 1.25rem;
+    }
+
+    /* Shared form styles */
+    .ep-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .ep-path  { font-family: monospace; font-size: 0.78rem; color: var(--accent); margin-bottom: 1.25rem; }
+
+    .field { margin-bottom: 0.9rem; }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--sub);
+      margin-bottom: 0.3rem;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: #475569; }
+
+    .send-btn {
+      width: 100%;
+      background: var(--btn);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.65rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.15s;
+      -webkit-appearance: none;
+    }
+    .send-btn:hover    { background: var(--btn-h); }
+    .send-btn:disabled { background: #312e81; cursor: not-allowed; }
+
+    /* Response */
+    .resp-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      flex-shrink: 0;
+    }
+    .resp-header span { font-size: 0.8rem; color: var(--muted); }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      display: none;
+    }
+    .badge.ok  { background: #064e3b; color: #34d399; display: inline-block; }
+    .badge.err { background: #7f1d1d; color: #f87171; display: inline-block; }
+
+    pre {
+      flex: 1;
+      background: #0a0c13;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow: auto;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--sub);
+      white-space: pre-wrap;
+      word-break: break-word;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .placeholder { color: #334155; font-style: italic; }
+
+    .json-key    { color: #818cf8; }
+    .json-string { color: #34d399; }
+    .json-number { color: #fb923c; }
+    .json-bool   { color: #f472b6; }
+    .json-null   { color: #94a3b8; }
+
+    /* ── Mobile overrides ── */
+    @media (max-width: 700px) {
+      .body-row { overflow: visible; }
+
+      nav { display: none; }
+
+      .tabbar { display: flex; }
+
+      .panels {
+        flex-direction: column;
+        overflow: visible;
+        flex: none;
+      }
+
+      .form-panel {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 1rem;
+      }
+
+      .response-panel {
+        padding: 1rem;
+        min-height: 60vh;
+        overflow: visible;
+      }
+
+      pre {
+        min-height: 40vh;
+        flex: none;
+      }
+
+      body { overflow-y: auto; }
+      .main { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>Intelligence API</h1>
+  <label for="base-url">Base URL</label>
+  <input id="base-url" value="http://localhost:8004" />
+</div>
+
+<!-- Mobile tab bar -->
+<div class="tabbar" id="tabbar"></div>
+
+<div class="body-row">
+
+  <!-- Desktop sidebar -->
+  <nav id="sidebar"></nav>
+
+  <div class="main">
+    <div class="panels">
+      <div class="form-panel" id="form-panel"></div>
+
+      <div class="response-panel">
+        <div class="resp-header">
+          <span>Response</span>
+          <span class="badge" id="badge"></span>
+          <span style="font-size:0.75rem;color:var(--muted)" id="duration"></span>
+        </div>
+        <pre id="response"><span class="placeholder">Hit Send to see the response here.</span></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const ENDPOINTS = {
+  health:      { label: "Health",        section: "General",   path: "GET /health",                       fields: [],                                                                                                                                          build: ()  => ({ url: "/health" }) },
+  earthquakes: { label: "Earthquakes",   section: "Hazards",   path: "GET /hazards/earthquakes",           fields: [{ id:"min_magnitude", label:"Min magnitude", ph:"5.0" }, { id:"limit", label:"Max results", ph:"20" }, { id:"days", label:"Days back", ph:"7" }], build: f  => ({ url:"/hazards/earthquakes",  params:{ min_magnitude:f.min_magnitude, limit:f.limit, days:f.days } }) },
+  fires:       { label: "Fires",         section: "Hazards",   path: "GET /hazards/fires",                 fields: [{ id:"days", label:"Days back (1–10)", ph:"1" }, { id:"region", label:"Region", ph:"world" }],                                            build: f  => ({ url:"/hazards/fires",        params:{ days:f.days, region:f.region } }) },
+  weather:     { label: "Weather",       section: "Hazards",   path: "GET /hazards/weather",               fields: [{ id:"lat", label:"Latitude", ph:"52.37" }, { id:"lon", label:"Longitude", ph:"4.90" }],                                                  build: f  => ({ url:"/hazards/weather",      params:{ lat:f.lat, lon:f.lon } }) },
+  flights:     { label: "Flights",       section: "Aviation",  path: "GET /aviation/flights",              fields: [{ id:"lamin", label:"South lat", ph:"36" }, { id:"lomin", label:"West lon", ph:"-10" }, { id:"lamax", label:"North lat", ph:"60" }, { id:"lomax", label:"East lon", ph:"30" }], build: f => ({ url:"/aviation/flights", params:{ lamin:f.lamin, lomin:f.lomin, lamax:f.lamax, lomax:f.lomax } }) },
+  flight:      { label: "Single flight", section: "Aviation",  path: "GET /aviation/flight/{icao24}",      fields: [{ id:"icao24", label:"ICAO24 hex", ph:"3c6444" }],                                                                                        build: f  => ({ url:`/aviation/flight/${f.icao24||"3c6444"}` }) },
+  vessels:     { label: "Vessels",       section: "Maritime",  path: "GET /maritime/vessels",              fields: [{ id:"latmin", label:"South lat", ph:"51" }, { id:"latmax", label:"North lat", ph:"57" }, { id:"lonmin", label:"West lon", ph:"2" }, { id:"lonmax", label:"East lon", ph:"8" }, { id:"mmsi", label:"MMSI (optional)", ph:"" }], build: f => ({ url:"/maritime/vessels", params:{ latmin:f.latmin, latmax:f.latmax, lonmin:f.lonmin, lonmax:f.lonmax, mmsi:f.mmsi } }) },
+  stocks:      { label: "Stocks",        section: "Markets",   path: "GET /markets/stocks",                fields: [{ id:"symbols", label:"Ticker symbols", ph:"AAPL,MSFT,GOOGL" }],                                                                          build: f  => ({ url:"/markets/stocks",       params:{ symbols:f.symbols } }) },
+  indices:     { label: "Indices",       section: "Markets",   path: "GET /markets/indices",               fields: [],                                                                                                                                          build: ()  => ({ url:"/markets/indices" }) },
+  crypto:      { label: "Crypto",        section: "Markets",   path: "GET /markets/crypto",                fields: [{ id:"coins", label:"CoinGecko coin IDs", ph:"bitcoin,ethereum,solana" }],                                                                build: f  => ({ url:"/markets/crypto",       params:{ coins:f.coins } }) },
+};
+
+const SECTIONS = ["General","Hazards","Aviation","Maritime","Markets"];
+let current = "health";
+
+// Build sidebar + tabbar
+const sidebar = document.getElementById("sidebar");
+const tabbar  = document.getElementById("tabbar");
+
+SECTIONS.forEach(sec => {
+  const label = document.createElement("div");
+  label.className = "section-label";
+  label.textContent = sec;
+  sidebar.appendChild(label);
+
+  Object.entries(ENDPOINTS).filter(([,e]) => e.section === sec).forEach(([key, ep]) => {
+    // Sidebar button
+    const sb = document.createElement("button");
+    sb.textContent = ep.label;
+    sb.id = "sb-" + key;
+    sb.onclick = () => load(key);
+    sidebar.appendChild(sb);
+
+    // Tab button
+    const tb = document.createElement("button");
+    tb.textContent = ep.label;
+    tb.id = "tb-" + key;
+    tb.onclick = () => load(key);
+    tabbar.appendChild(tb);
+  });
+});
+
+function load(key) {
+  current = key;
+  const ep = ENDPOINTS[key];
+
+  // Active state
+  document.querySelectorAll("nav button, .tabbar button").forEach(b => b.classList.remove("active"));
+  document.getElementById("sb-" + key)?.classList.add("active");
+  document.getElementById("tb-" + key)?.classList.add("active");
+
+  // Scroll tab into view on mobile
+  document.getElementById("tb-" + key)?.scrollIntoView({ inline: "center", behavior: "smooth" });
+
+  // Build form
+  document.getElementById("form-panel").innerHTML = `
+    <div class="ep-title">${ep.label}</div>
+    <div class="ep-path">${ep.path}</div>
+    ${ep.fields.map(f => `
+      <div class="field">
+        <label for="${f.id}">${f.label}</label>
+        <input id="${f.id}" placeholder="${f.ph}" inputmode="${f.id==='lat'||f.id==='lon'||f.id==='lamin'||f.id==='lamax'||f.id==='lomin'||f.id==='lomax'||f.id==='latmin'||f.id==='latmax'||f.id==='lonmin'||f.id==='lonmax'||f.id==='min_magnitude'||f.id==='limit'||f.id==='days' ? 'decimal' : 'text'}" />
+      </div>
+    `).join("")}
+    <button class="send-btn" id="send-btn" onclick="send()">Send</button>
+  `;
+
+  // Reset response
+  document.getElementById("response").innerHTML = '<span class="placeholder">Hit Send to see the response here.</span>';
+  document.getElementById("badge").className = "badge";
+  document.getElementById("duration").textContent = "";
+}
+
+async function send() {
+  const ep = ENDPOINTS[current];
+  const fields = {};
+  ep.fields.forEach(f => { fields[f.id] = document.getElementById(f.id).value.trim(); });
+
+  const { url, params = {} } = ep.build(fields);
+  const query = Object.entries(params).filter(([,v]) => v !== "").map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+  const base = document.getElementById("base-url").value.replace(/\/$/, "");
+  const fullUrl = base + url + (query ? "?" + query : "");
+
+  const btn = document.getElementById("send-btn");
+  btn.disabled = true; btn.textContent = "Sending…";
+  document.getElementById("response").innerHTML = '<span class="placeholder">Loading…</span>';
+
+  const t0 = Date.now();
+  try {
+    const res  = await fetch(fullUrl);
+    const ms   = Date.now() - t0;
+    const data = await res.json();
+    const badge = document.getElementById("badge");
+    badge.textContent = res.status + " " + res.statusText;
+    badge.className = "badge " + (res.ok ? "ok" : "err");
+    document.getElementById("duration").textContent = ms + " ms";
+    document.getElementById("response").innerHTML = highlight(JSON.stringify(data, null, 2));
+  } catch(e) {
+    document.getElementById("badge").className = "badge err";
+    document.getElementById("badge").textContent = "Error";
+    document.getElementById("duration").textContent = "";
+    document.getElementById("response").textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Send";
+  }
+}
+
+function highlight(json) {
+  return json.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="json-key">${m}</span>` : `<span class="json-string">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="json-bool">${m}</span>`;
+      if (/null/.test(m))       return `<span class="json-null">${m}</span>`;
+      return `<span class="json-number">${m}</span>`;
+    });
+}
+
+// Init
+load("health");
+</script>
+</body>
+</html>
