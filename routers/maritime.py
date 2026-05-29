@@ -1,46 +1,71 @@
+import asyncio
+import json
 import os
 from typing import Optional
 
-import httpx
+import websockets
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
-AISHUB_USER = os.getenv("AISHUB_USERNAME", "")
+WS_URL = "wss://stream.aisstream.io/v0/stream"
 
 
-@router.get("/vessels", summary="Live vessel positions (AISHub) — requires free account")
+@router.get("/vessels", summary="Live vessel positions (aisstream.io) — requires free API key")
 async def get_vessels(
     latmin: float = Query(..., description="South latitude"),
     latmax: float = Query(..., description="North latitude"),
     lonmin: float = Query(..., description="West longitude"),
     lonmax: float = Query(..., description="East longitude"),
     mmsi: Optional[str] = Query(None, description="Filter by MMSI number"),
+    limit: int = Query(50, ge=1, le=500, description="Max vessels to collect"),
+    timeout: int = Query(8, ge=1, le=30, description="Seconds to collect data"),
 ):
-    if not AISHUB_USER:
+    AISSTREAM_KEY = os.getenv("AISSTREAM_API_KEY", "")
+    if not AISSTREAM_KEY:
         raise HTTPException(
             status_code=503,
-            detail="AISHUB_USERNAME is not configured. Register free at https://www.aishub.net/register",
+            detail="AISSTREAM_API_KEY is not configured. Get a free key at https://aisstream.io",
         )
 
-    params = {
-        "username": AISHUB_USER,
-        "format": 1,
-        "output": "json",
-        "compress": 0,
-        "latmin": latmin,
-        "latmax": latmax,
-        "lonmin": lonmin,
-        "lonmax": lonmax,
+    subscription: dict = {
+        "APIKey": AISSTREAM_KEY,
+        "BoundingBoxes": [[[latmin, lonmin], [latmax, lonmax]]],
     }
     if mmsi:
-        params["mmsi"] = mmsi
+        subscription["MMSI"] = [int(mmsi)]
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get("http://data.aishub.net/ws.php", params=params, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
+    vessels: dict = {}
+    try:
+        async with websockets.connect(WS_URL) as ws:
+            await ws.send(json.dumps(subscription))
+            deadline = asyncio.get_event_loop().time() + timeout
+            async for raw in ws:
+                if asyncio.get_event_loop().time() >= deadline or len(vessels) >= limit:
+                    break
+                msg = json.loads(raw)
+                if msg.get("MessageType") != "PositionReport":
+                    continue
+                meta = msg.get("MetaData", {})
+                pr = msg["Message"]["PositionReport"]
+                mmsi_val = str(pr.get("UserID", ""))
+                if not mmsi_val:
+                    continue
+                vessels[mmsi_val] = {
+                    "mmsi": mmsi_val,
+                    "name": meta.get("ShipName", "").strip(),
+                    "latitude": pr.get("Latitude"),
+                    "longitude": pr.get("Longitude"),
+                    "speed_knots": pr.get("Sog"),
+                    "course": pr.get("Cog"),
+                    "heading": pr.get("TrueHeading"),
+                    "nav_status": pr.get("NavigationalStatus"),
+                    "time_utc": meta.get("time_utc"),
+                }
+    except websockets.exceptions.ConnectionClosedError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
-    # AISHub returns [metadata_dict, [vessel_list]]
-    vessels = data[1] if isinstance(data, list) and len(data) > 1 else []
-    return {"count": len(vessels), "vessels": vessels}
+    result = list(vessels.values())
+    return {"count": len(result), "vessels": result}

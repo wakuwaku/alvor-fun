@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
-FIRMS_KEY = os.getenv("NASA_FIRMS_API_KEY", "")
 
 
 @router.get("/earthquakes", summary="Recent earthquakes (USGS)")
@@ -57,6 +56,7 @@ async def get_fires(
     days: int = Query(1, ge=1, le=10, description="Days to look back (1–10)"),
     region: str = Query("world", description="Region: world, USA, Canada, Europe, …"),
 ):
+    FIRMS_KEY = os.getenv("NASA_FIRMS_API_KEY", "")
     if not FIRMS_KEY:
         raise HTTPException(
             status_code=503,

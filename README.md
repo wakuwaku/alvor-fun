@@ -12,19 +12,23 @@ pip install -r requirements.txt
 
 ### 2. Configure API keys
 
-```bash
-cp .env.example .env
-# Open .env and fill in your keys (see API Keys section below)
+Create a `.env` file in the project root:
+
+```env
+NASA_FIRMS_API_KEY=your_key_here
+AISSTREAM_API_KEY=your_key_here
+OPENSKY_USERNAME=your_username_here   # optional
+OPENSKY_PASSWORD=your_password_here   # optional
 ```
 
 ### 3. Run the server
 
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8004
 ```
 
-The API is available at `http://localhost:8000`.  
-Interactive docs (Swagger UI): `http://localhost:8000/docs`
+The API is available at `http://localhost:8004`.  
+Interactive docs (Swagger UI): `http://localhost:8004/docs`
 
 ---
 
@@ -54,8 +58,7 @@ Data source: [USGS Earthquake API](https://earthquake.usgs.gov/fdsnws/event/1/) 
 | `days` | `7` | How many days to look back |
 
 ```bash
-# Magnitude 6+ earthquakes in the last 30 days
-curl "http://localhost:8000/hazards/earthquakes?min_magnitude=6&days=30"
+curl "http://localhost:8004/hazards/earthquakes?min_magnitude=6&days=30"
 ```
 
 <details>
@@ -90,7 +93,7 @@ curl "http://localhost:8000/hazards/earthquakes?min_magnitude=6&days=30"
 ```
 GET /hazards/fires
 ```
-Data source: [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/area/)
+Data source: [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/area/) — get a free key at [firms.modaps.eosdis.nasa.gov](https://firms.modaps.eosdis.nasa.gov/api/area/)
 
 | Parameter | Default | Description |
 |---|---|---|
@@ -98,8 +101,7 @@ Data source: [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/area/)
 | `region` | `world` | Region: `world`, `USA`, `Canada`, `Europe`, etc. |
 
 ```bash
-# Active fires in Europe today
-curl "http://localhost:8000/hazards/fires?region=Europe&days=1"
+curl "http://localhost:8004/hazards/fires?region=Europe&days=1"
 ```
 
 ---
@@ -116,8 +118,7 @@ Data source: [Open-Meteo](https://open-meteo.com/) — **no API key needed**
 | `lon` | Yes | Longitude |
 
 ```bash
-# Current weather in Amsterdam
-curl "http://localhost:8000/hazards/weather?lat=52.37&lon=4.90"
+curl "http://localhost:8004/hazards/weather?lat=52.37&lon=4.90"
 ```
 
 <details>
@@ -143,7 +144,7 @@ curl "http://localhost:8000/hazards/weather?lat=52.37&lon=4.90"
 ```
 GET /aviation/flights
 ```
-Data source: [OpenSky Network](https://opensky-network.org/) — **no key needed, optional auth increases limits**
+Data source: [OpenSky Network](https://opensky-network.org/) — **no key needed, optional credentials reduce rate limiting**
 
 | Parameter | Required | Description |
 |---|---|---|
@@ -153,11 +154,11 @@ Data source: [OpenSky Network](https://opensky-network.org/) — **no key needed
 | `lomax` | No | East longitude of bounding box |
 
 ```bash
-# All flights over Western Europe
-curl "http://localhost:8000/aviation/flights?lamin=36&lomin=-10&lamax=60&lomax=30"
+# Flights over Western Europe
+curl "http://localhost:8004/aviation/flights?lamin=36&lomin=-10&lamax=60&lomax=30"
 
-# All flights worldwide (very large response)
-curl "http://localhost:8000/aviation/flights"
+# All flights worldwide (large response)
+curl "http://localhost:8004/aviation/flights"
 ```
 
 <details>
@@ -192,35 +193,61 @@ GET /aviation/flight/{icao24}
 ```
 
 ```bash
-# Look up a specific aircraft by its ICAO24 hex code
-curl "http://localhost:8000/aviation/flight/3c6444"
+curl "http://localhost:8004/aviation/flight/3c6444"
 ```
 
 ---
 
-### Maritime *(requires AISHub account)*
+### Maritime *(requires aisstream.io API key)*
 
 #### Vessel Positions
 ```
 GET /maritime/vessels
 ```
-Data source: [AISHub](https://www.aishub.net/) — **free registration required**
+Data source: [aisstream.io](https://aisstream.io) — free key, email signup required
 
-| Parameter | Required | Description |
-|---|---|---|
-| `latmin` | Yes | South latitude |
-| `latmax` | Yes | North latitude |
-| `lonmin` | Yes | West longitude |
-| `lonmax` | Yes | East longitude |
-| `mmsi` | No | Filter by MMSI number |
+Opens a WebSocket stream, collects vessel positions within the bounding box for `timeout` seconds, then returns the results.
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `latmin` | Yes | — | South latitude |
+| `latmax` | Yes | — | North latitude |
+| `lonmin` | Yes | — | West longitude |
+| `lonmax` | Yes | — | East longitude |
+| `mmsi` | No | — | Filter by MMSI number |
+| `limit` | No | `50` | Max vessels to collect (max 500) |
+| `timeout` | No | `8` | Seconds to collect data (max 30) |
 
 ```bash
 # Vessels in the North Sea
-curl "http://localhost:8000/maritime/vessels?latmin=51&latmax=57&lonmin=2&lonmax=8"
+curl "http://localhost:8004/maritime/vessels?latmin=51&latmax=57&lonmin=2&lonmax=8"
 
 # Specific vessel by MMSI
-curl "http://localhost:8000/maritime/vessels?latmin=51&latmax=57&lonmin=2&lonmax=8&mmsi=244810000"
+curl "http://localhost:8004/maritime/vessels?latmin=51&latmax=57&lonmin=2&lonmax=8&mmsi=244810000"
 ```
+
+<details>
+<summary>Example response</summary>
+
+```json
+{
+  "count": 50,
+  "vessels": [
+    {
+      "mmsi": "244690666",
+      "name": "BRABANT",
+      "latitude": 52.04367,
+      "longitude": 5.10149,
+      "speed_knots": 3.2,
+      "course": 185.0,
+      "heading": 183,
+      "nav_status": 0,
+      "time_utc": "2024-05-15 14:00:00"
+    }
+  ]
+}
+```
+</details>
 
 ---
 
@@ -237,7 +264,7 @@ Data source: Yahoo Finance via yfinance — **no API key needed**
 | `symbols` | `AAPL,MSFT,GOOGL,AMZN` | Comma-separated ticker symbols |
 
 ```bash
-curl "http://localhost:8000/markets/stocks?symbols=AAPL,MSFT,TSLA"
+curl "http://localhost:8004/markets/stocks?symbols=AAPL,MSFT,TSLA"
 ```
 
 <details>
@@ -263,10 +290,10 @@ curl "http://localhost:8000/markets/stocks?symbols=AAPL,MSFT,TSLA"
 ```
 GET /markets/indices
 ```
-Returns S&P 500, Dow Jones, NASDAQ, DAX, FTSE 100, Nikkei 225, AEX.
+Returns live prices for S&P 500, Dow Jones, NASDAQ, DAX, FTSE 100, Nikkei 225, AEX. **No API key needed.**
 
 ```bash
-curl "http://localhost:8000/markets/indices"
+curl "http://localhost:8004/markets/indices"
 ```
 
 ---
@@ -282,7 +309,7 @@ Data source: [CoinGecko](https://www.coingecko.com/en/api) — **no API key need
 | `coins` | `bitcoin,ethereum,solana,ripple` | CoinGecko coin IDs |
 
 ```bash
-curl "http://localhost:8000/markets/crypto?coins=bitcoin,ethereum,cardano"
+curl "http://localhost:8004/markets/crypto?coins=bitcoin,ethereum,cardano"
 ```
 
 <details>
@@ -306,7 +333,7 @@ curl "http://localhost:8000/markets/crypto?coins=bitcoin,ethereum,cardano"
 | Service | Endpoint(s) | Required | Sign up |
 |---|---|---|---|
 | NASA FIRMS | `/hazards/fires` | Yes | [firms.modaps.eosdis.nasa.gov](https://firms.modaps.eosdis.nasa.gov/api/area/) |
-| AISHub | `/maritime/vessels` | Yes | [aishub.net/register](https://www.aishub.net/register) |
+| aisstream.io | `/maritime/vessels` | Yes | [aisstream.io](https://aisstream.io) |
 | OpenSky Network | `/aviation/*` | No (optional) | [opensky-network.org](https://opensky-network.org/login) |
 
 All other endpoints (earthquakes, weather, stocks, indices, crypto) work without any API key.
@@ -319,10 +346,10 @@ All other endpoints (earthquakes, weather, stocks, indices, crypto) work without
 .
 ├── main.py              # FastAPI app + router registration
 ├── requirements.txt
-├── .env.example         # Copy to .env and fill in your keys
+├── .env                 # API keys (create this file)
 └── routers/
     ├── hazards.py       # /hazards/earthquakes, /fires, /weather
     ├── aviation.py      # /aviation/flights, /flight/{icao24}
-    ├── maritime.py      # /maritime/vessels
+    ├── maritime.py      # /maritime/vessels  (aisstream.io WebSocket)
     └── markets.py       # /markets/stocks, /indices, /crypto
 ```
